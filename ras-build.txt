@@ -1,0 +1,378 @@
+https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
+
+
+pip3 install --extra-index-url https://google-coral.github.io/py-repo/ tflite_runtime
+
+--
+pi@raspberrypi:~ $ su root
+Password: 
+root@raspberrypi:/home/pi# cd ..//..
+root@raspberrypi:/# ls
+Arduino  bin  boot  dev  etc  home  lib  lost+found  media  mnt  opt  proc  RaspberriPi  root  run  sbin  srv  STM32  sys  tmp	usr  var
+root@raspberrypi:/# pip3 install --extra-index-url https://google-coral.github.io/py-repo/ tflite_runtime
+Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple, https://google-coral.github.io/py-repo/
+Collecting tflite_runtime
+  Downloading https://github.com/google-coral/pycoral/releases/download/v1.0.1/tflite_runtime-2.5.0-cp37-cp37m-linux_armv7l.whl (1.1 MB)
+     |¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦| 1.1 MB 1.9 MB/s 
+Requirement already satisfied: numpy>=1.12.1 in /usr/lib/python3/dist-packages (from tflite_runtime) (1.16.2)
+Installing collected packages: tflite-runtime
+Successfully installed tflite-runtime-2.5.0
+WARNING: Running pip as root will break packages and permissions. You should install packages reliably by using venv: https://pip.pypa.io/warnings/venv
+root@raspberrypi:/# su pi
+pi@raspberrypi:/ $ pip3 install --extra-index-url https://google-coral.github.io/py-repo/ tflite_runtime
+Defaulting to user installation because normal site-packages is not writeable
+Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple, https://google-coral.github.io/py-repo/
+Requirement already satisfied: tflite_runtime in /usr/local/lib/python3.7/dist-packages (2.5.0)
+Requirement already satisfied: numpy>=1.12.1 in /usr/lib/python3/dist-packages (from tflite_runtime) (1.16.2)
+pi@raspberrypi:/ $ 
+
+--
+
+didnt work:
+--
+# Copyright 2018 The TensorFlow Authors. All Rights Reserved.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# ==============================================================================
+"""label_image for tflite."""
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import argparse
+import time
+
+import numpy as np
+from PIL import Image
+
+import tflite_runtime.interpreter as tflite
+
+
+def load_labels(filename):
+  with open(filename, 'r') as f:
+    return [line.strip() for line in f.readlines()]
+
+
+if __name__ == '__main__':
+  parser = argparse.ArgumentParser()
+  parser.add_argument(
+      '-i',
+      '--image',
+      default='/tmp/grace_hopper.bmp',
+      help='image to be classified')
+  parser.add_argument(
+      '-m',
+      '--model_file',
+      default='/tmp/mobilenet_v1_1.0_224_quant.tflite',
+      help='.tflite model to be executed')
+  parser.add_argument(
+      '-l',
+      '--label_file',
+      default='/tmp/labels.txt',
+      help='name of file containing labels')
+  parser.add_argument(
+      '--input_mean',
+      default=127.5, type=float,
+      help='input_mean')
+  parser.add_argument(
+      '--input_std',
+      default=127.5, type=float,
+      help='input standard deviation')
+  parser.add_argument(
+      '--num_threads', default=None, type=int, help='number of threads')
+  args = parser.parse_args()
+
+  
+
+  interpreter = tflite.Interpreter(model_path=args.model_file)
+  interpreter.allocate_tensors()
+
+  input_details = interpreter.get_input_details()
+  output_details = interpreter.get_output_details()
+
+  # check the type of the input tensor
+  floating_model = input_details[0]['dtype'] == np.float32
+
+  # NxHxWxC, H:1, W:2
+  height = input_details[0]['shape'][1]
+  width = input_details[0]['shape'][2]
+  img = Image.open(args.image).resize((width, height))
+
+  # add N dim
+  input_data = np.expand_dims(img, axis=0)
+
+  if floating_model:
+    input_data = (np.float32(input_data) - args.input_mean) / args.input_std
+
+  interpreter.set_tensor(input_details[0]['index'], input_data)
+
+  start_time = time.time()
+  interpreter.invoke()
+  stop_time = time.time()
+
+  output_data = interpreter.get_tensor(output_details[0]['index'])
+  results = np.squeeze(output_data)
+
+  top_k = results.argsort()[-5:][::-1]
+  labels = load_labels(args.label_file)
+  for i in top_k:
+    if floating_model:
+      print('{:08.6f}: {}'.format(float(results[i]), labels[i]))
+    else:
+      print('{:08.6f}: {}'.format(float(results[i] / 255.0), labels[i]))
+
+  print('time: {:.3f}ms'.format((stop_time - start_time) * 1000))
+
+--
+
+works:
+
+https://github.com/tensorflow/examples/tree/master/lite/examples/image_classification/raspberry_pi
+
+--
+pi@raspberrypi:~ $ su root
+Password: 
+root@raspberrypi:/home/pi# cd ..//..
+root@raspberrypi:/# ls
+Arduino  bin  boot  dev  etc  home  lib  lost+found  media  mnt  opt  proc  RaspberriPi  root  run  sbin  srv  STM32  sys  tmp	usr  var
+root@raspberrypi:/# pip3 install --extra-index-url https://google-coral.github.io/py-repo/ tflite_runtime
+Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple, https://google-coral.github.io/py-repo/
+Collecting tflite_runtime
+  Downloading https://github.com/google-coral/pycoral/releases/download/v1.0.1/tflite_runtime-2.5.0-cp37-cp37m-linux_armv7l.whl (1.1 MB)
+     |¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦¦| 1.1 MB 1.9 MB/s 
+Requirement already satisfied: numpy>=1.12.1 in /usr/lib/python3/dist-packages (from tflite_runtime) (1.16.2)
+Installing collected packages: tflite-runtime
+Successfully installed tflite-runtime-2.5.0
+WARNING: Running pip as root will break packages and permissions. You should install packages reliably by using venv: https://pip.pypa.io/warnings/venv
+root@raspberrypi:/# su pi
+pi@raspberrypi:/ $ pip3 install --extra-index-url https://google-coral.github.io/py-repo/ tflite_runtime
+Defaulting to user installation because normal site-packages is not writeable
+Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple, https://google-coral.github.io/py-repo/
+Requirement already satisfied: tflite_runtime in /usr/local/lib/python3.7/dist-packages (2.5.0)
+Requirement already satisfied: numpy>=1.12.1 in /usr/lib/python3/dist-packages (from tflite_runtime) (1.16.2)
+pi@raspberrypi:/ $ git clone https://github.com/tensorflow/examples --depth 1
+fatal: could not create work tree dir 'examples': Permission denied
+pi@raspberrypi:/ $ su root
+Password: 
+root@raspberrypi:/# git clone https://github.com/tensorflow/examples --depth 1
+Cloning into 'examples'...
+remote: Enumerating objects: 2121, done.
+remote: Counting objects: 100% (2121/2121), done.
+remote: Compressing objects: 100% (1336/1336), done.
+remote: Total 2121 (delta 611), reused 1653 (delta 440), pack-reused 0
+Receiving objects: 100% (2121/2121), 11.66 MiB | 4.50 MiB/s, done.
+Resolving deltas: 100% (611/611), done.
+root@raspberrypi:/# cd examples/lite/examples/image_classification/raspberry_pi
+root@raspberrypi:/examples/lite/examples/image_classification/raspberry_pi# 
+root@raspberrypi:/examples/lite/examples/image_classification/raspberry_pi# bash download.sh /tmp
+Looking in indexes: https://pypi.org/simple, https://www.piwheels.org/simple
+Requirement already satisfied: numpy in /usr/lib/python3/dist-packages (from -r requirements.txt (line 2)) (1.16.2)
+Requirement already satisfied: picamera in /usr/lib/python3/dist-packages (from -r requirements.txt (line 3)) (1.13)
+Requirement already satisfied: Pillow in /usr/lib/python3/dist-packages (from -r requirements.txt (line 4)) (5.4.1)
+WARNING: Running pip as root will break packages and permissions. You should install packages reliably by using venv: https://pip.pypa.io/warnings/venv
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 2997k  100 2997k    0     0  4375k      0 --:--:-- --:--:-- --:--:-- 4375k
+Archive:  mobilenet_v1_1.0_224_quant_and_labels.zip
+  inflating: /tmp/labels_mobilenet_quant_v1_224.txt  
+   creating: /tmp/__MACOSX/
+  inflating: /tmp/__MACOSX/._labels_mobilenet_quant_v1_224.txt  
+  inflating: /tmp/mobilenet_v1_1.0_224_quant.tflite  
+  inflating: /tmp/__MACOSX/._mobilenet_v1_1.0_224_quant.tflite  
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 4428k  100 4428k    0     0  5514k      0 --:--:-- --:--:-- --:--:-- 5514k
+Downloaded files are in /tmp
+root@raspberrypi:/examples/lite/examples/image_classification/raspberry_pi# python3 classify_picamera.py \
+>   --model /tmp/mobilenet_v1_1.0_224_quant.tflite \
+>   --labels /tmp/labels_mobilenet_quant_v1_224.txt
+
+^CTraceback (most recent call last):
+  File "classify_picamera.py", line 96, in <module>
+    main()
+  File "classify_picamera.py", line 84, in main
+    results = classify_image(interpreter, image)
+  File "classify_picamera.py", line 46, in classify_image
+    interpreter.invoke()
+  File "/usr/local/lib/python3.7/dist-packages/tflite_runtime/interpreter.py", line 540, in invoke
+    self._interpreter.Invoke()
+KeyboardInterrupt
+root@raspberrypi:/examples/lite/examples/image_classification/raspberry_pi# 
+--
+
+
+run:
+works:
+python3 classify_picamera.py \
+  --model /tmp/mobilenet_v1_1.0_224_quant.tflite \
+  --labels /tmp/labels_mobilenet_quant_v1_224.txt
+  
+  
+
+
+links:  
+--
+https://github.com/tensorflow/examples/tree/master/lite/examples/image_classification/raspberry_pi
+
+https://github.com/tensorflow/tensorflow/blob/master/tensorflow/lite/examples/python/label_image.py
+
+https://github.com/tensorflow/tensorflow/tree/master/tensorflow/lite/examples/python/
+
+https://www.tensorflow.org/lite/guide/python#install_tensorflow_lite_for_python
+
+
+https://www.tensorflow.org/lite/examples
+
+https://towardsdatascience.com/3-ways-to-install-tensorflow-2-on-raspberry-pi-fe1fa2da9104
+
+https://github.com/samjabrahams/tensorflow-on-raspberry-pi
+
+
+--
+
+
+https://blog.paperspace.com/tensorflow-lite-raspberry-pi/
+
+mobilenet_v1_1.0_224_quant.tflite
+labels_mobilenet_quant_v1_224.txt
+
+/home/pi/TFLite_MobileNet
+	mobilenet_v1_1.0_224_quant.tflite
+	labels_mobilenet_quant_v1_224.txt
+	test.jpg
+    
+--
+from tflite_runtime.interpreter import Interpreter 
+from PIL import Image
+import numpy as np
+import time
+
+def load_labels(path): # Read the labels from the text file as a Python list.
+  with open(path, 'r') as f:
+    return [line.strip() for i, line in enumerate(f.readlines())]
+
+def set_input_tensor(interpreter, image):
+  tensor_index = interpreter.get_input_details()[0]['index']
+  input_tensor = interpreter.tensor(tensor_index)()[0]
+  input_tensor[:, :] = image
+
+def classify_image(interpreter, image, top_k=1):
+  set_input_tensor(interpreter, image)
+
+  interpreter.invoke()
+  output_details = interpreter.get_output_details()[0]
+  output = np.squeeze(interpreter.get_tensor(output_details['index']))
+
+  scale, zero_point = output_details['quantization']
+  output = scale * (output - zero_point)
+
+  ordered = np.argpartition(-output, 1)
+  return [(i, output[i]) for i in ordered[:top_k]][0]
+
+data_folder = "/home/pi/TFLite_MobileNet/"
+
+model_path = data_folder + "mobilenet_v1_1.0_224_quant.tflite"
+label_path = data_folder + "labels_mobilenet_quant_v1_224.txt"
+
+interpreter = Interpreter(model_path)
+print("Model Loaded Successfully.")
+
+interpreter.allocate_tensors()
+_, height, width, _ = interpreter.get_input_details()[0]['shape']
+print("Image Shape (", width, ",", height, ")")
+
+# Load an image to be classified.
+image = Image.open(data_folder + "test.jpg").convert('RGB').resize((width, height))
+
+# Classify the image.
+time1 = time.time()
+label_id, prob = classify_image(interpreter, image)
+time2 = time.time()
+classification_time = np.round(time2-time1, 3)
+print("Classificaiton Time =", classification_time, "seconds.")
+
+# Read class labels.
+labels = load_labels(label_path)
+
+# Return the classification label of the image.
+classification_label = labels[label_id]
+print("Image Label is :", classification_label, ", with Accuracy :", np.round(prob*100, 2), "%.")
+--
+
+
+--
+Python 3.7.3 (default, Jan 22 2021, 20:04:44) 
+[GCC 8.3.0] on linux
+Type "help", "copyright", "credits" or "license()" for more information.
+>>> 
+=================== RESTART: /home/pi/classify_image_dt.py ===================
+Model Loaded Successfully.
+Image Shape ( 224 , 224 )
+Classificaiton Time = 0.142 seconds.
+Image Label is : Egyptian cat , with Accuracy : 72.27 %.
+>>> 
+=================== RESTART: /home/pi/classify_image_dt.py ===================
+Model Loaded Successfully.
+Image Shape ( 224 , 224 )
+Classificaiton Time = 0.138 seconds.
+Image Label is : Egyptian cat , with Accuracy : 72.27 %.
+>>> 
+--
+
+# Load an image to be classified.
+image = Image.open(data_folder + "IMG_0689.jpg").convert('RGB').resize((width, height))
+
+--
+pi@raspberrypi:~ $ cd Desktop
+pi@raspberrypi:~/Desktop $ ls
+image0.jpg  image4.jpg       labels_mobilenet_quant_v1_224.txt  video0.h264      videotest2.h264
+image1.jpg  image.jpg        MLX90640_Thermal_Camera_Code.7z    video.h264       videotest3.h264
+image2.jpg  image-small.jpg  mobilenet_v1_1.0_224_quant.tflite  videotest0.h264  videotest4.h264
+image3.jpg  imagetest.jpg    test.jpg                           videotest1.h264  videotest.h264
+pi@raspberrypi:~/Desktop $ cp mobilenet_v1_1.0_224_quant.tflite /home/pi/TFLite_MobileNet/
+pi@raspberrypi:~/Desktop $ cp labels_mobilenet_quant_v1_224.txt /home/pi/TFLite_MobileNet/
+pi@raspberrypi:~/Desktop $ cp test.jpg /home/pi/TFLite_MobileNet/
+pi@raspberrypi:~/Desktop $ cp IMG_0689.jpg /home/pi/TFLite_MobileNet/
+pi@raspberrypi:~/Desktop $ 
+--
+
+--
+pi@raspberrypi:~ $ mkdir TFLite_MobileNet
+pi@raspberrypi:~ $ chmod 777 TFLite_MobileNet
+pi@raspberrypi:~ $ ls 
+cameraphotos5.py  Documents                 Music                              testMLX90640visual2.py  Videos
+cameraphotos.py   Downloads                 Pictures                           testMLX90640visual.py
+camera.py         label_image.py            Public                             testMLX9064o.py
+cameravideo5.py   MagPi                     rpi_camera_surveillance_system.py  test-tf.py
+Desktop           mlx90640_test_fliplr.png  Templates                          TFLite_MobileNet
+pi@raspberrypi:~ $ cd TF*
+pi@raspberrypi:~/TFLite_MobileNet $ ls
+mobilenet_v1_1.0_224_quant.tflite
+pi@raspberrypi:~/TFLite_MobileNet $ ls
+labels_mobilenet_quant_v1_224.txt  mobilenet_v1_1.0_224_quant.tflite  test.jpg
+pi@raspberrypi:~/TFLite_MobileNet $ ls
+IMG_0689.jpg  labels_mobilenet_quant_v1_224.txt  mobilenet_v1_1.0_224_quant.tflite  test.jpg
+pi@raspberrypi:~/TFLite_MobileNet $ 
+--
+
+
+
+
+
+
+
+https://blog.paperspace.com/tensorflow-lite-raspberry-pi/
+
+https://www.linkedin.com/pulse/building-image-classifier-running-raspberry-pi-ahmed-gad
+
