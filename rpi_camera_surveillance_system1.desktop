@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=rpi_camera_surveillance_system 
+Comment=run webcam from desktop shortcut icon
+Encoding=UTF-8
+Version=1.0
+Name=webcam
+Type=Application
+Terminal=true
+StartupNotify=true
+Exec=/usr/bin/python3 /home/pi/Desktop/build/rpi_camera_surveillance_system.py
+

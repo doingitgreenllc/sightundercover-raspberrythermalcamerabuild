@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=rpi-thermal-camera
+Comment=run thermal camera from desktop shortcut icon
+Encoding=UTF-8
+Version=1.0
+Name=thermal camera
+Type=Application
+Terminal=true
+StartupNotify=true
+Exec=lxterminal -t "run thermal"  --working-directory=/home/pi/Desktop/build/RaspberriPi/C++显示屏显示/MLX90640_Thermal_Camera_SDL2/ -e ./main
+
